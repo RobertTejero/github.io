@@ -1,0 +1,578 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy static content to Pages
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Single deploy job since we're just deploying
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Carga Compensatoria Post-Partido</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.35/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            background-color: #f7f7f7; /* Fondo gris muy claro */
+            color: #333; /* Texto principal más oscuro */
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .calculator-container {
+            background-color: #fff; /* Fondo blanco para el contenedor */
+            padding: 2rem;
+            border-radius: 0.75rem; /* Bordes más redondeados */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Sombra suave */
+            width: 90%;
+            max-width: 800px; /* Aumentar el ancho máximo */
+        }
+        h1 {
+            color: #374151; /* Título en gris oscuro */
+        }
+        label {
+            color: #4b5563; /* Etiqueta en gris un poco más claro */
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input[type="number"], select {
+            border-color: #d1d5db; /* Borde gris claro para los inputs */
+            border-width: 1px;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            width: 100%;
+            margin-bottom: 1rem;
+            color: #333;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        button {
+            color: white !important;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .bg-green-500 {
+            background-color: #4CAF50; /* Verde más llamativo */
+        }
+        .bg-green-500:hover {
+            background-color: #45a049;
+        }
+        .bg-blue-500 {
+            background-color: #2196F3; /* Azul más moderno */
+        }
+        .bg-blue-500:hover {
+            background-color: #1e88e5;
+        }
+        .bg-indigo-500 {
+            background-color: #673AB7; /* Morado elegante */
+        }
+        .bg-indigo-500:hover {
+            background-color: #5e35b1;
+        }
+        .bg-red-500 {
+            background-color: #F44336; /* Rojo vivo */
+        }
+        .bg-red-500:hover {
+            background-color: #e53935;
+        }
+        #resultados {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #f9f9f9; /* Fondo muy claro para los resultados */
+            border-radius: 0.5rem;
+            border: 1px solid #eee;
+        }
+        #resultados h2 {
+            color: #374151;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 2px solid #e0e0e0; /* Línea sutil debajo del título */
+            padding-bottom: 0.5rem;
+        }
+        .metric-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+            background-color: white; /* Fondo blanco para la tabla */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+            border-radius: 0.5rem;
+            overflow: auto; /* Añadido overflow para evitar problemas de impresión */
+        }
+        .metric-table th, .metric-table td {
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem; /* Reducir el padding para que quepa más contenido */
+            text-align: left;
+            white-space: nowrap; /* Evitar que el texto se rompa innecesariamente */
+            font-size: 0.8em; /* Reducir el tamaño de la fuente de la tabla */
+        }
+        .metric-table th {
+            background-color: #f3f4f6; /* Gris muy claro para el encabezado */
+            font-weight: bold;
+            color: #4b5563;
+        }
+        .metric-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9; /* Un ligero contraste para las filas pares */
+        }
+        /* Estilos para la impresión */
+        @media print {
+            body {
+                background-color: white !important;
+                color: black !important;
+                font-size: 0.9em; /* Reducir la fuente general en la impresión */
+            }
+            .calculator-container {
+                background-color: white !important;
+                padding: 0.5rem !important; /* Reducir el padding del contenedor en la impresión */
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                max-width: none !important; /* Eliminar la restricción de ancho */
+                width: 100% !important;
+            }
+            h1 {
+                font-size: 1.5em !important; /* Reducir el tamaño del título principal */
+                margin-bottom: 0.5rem !important;
+            }
+            #calculator-inputs,
+            button {
+                display: none !important;
+            }
+            #resultados {
+                margin-top: 0.5rem !important; /* Reducir el margen superior de los resultados */
+                padding: 0.5rem !important; /* Reducir el padding de los resultados */
+                background-color: white !important;
+                border: none !important;
+            }
+            #resultados h2 {
+                font-size: 1.1em !important; /* Reducir el tamaño de los subtítulos */
+                border-bottom: 1px solid #333;
+                padding-bottom: 0.15rem;
+                margin-top: 0.75rem !important;
+                margin-bottom: 0.3rem !important;
+            }
+            .metric-table {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                overflow: visible !important; /* Permitir que la tabla se extienda si es necesario */
+                margin-bottom: 0.5rem !important; /* Reducir el margen inferior de la tabla */
+            }
+            .metric-table th, .metric-table td {
+                border: 1px solid #333;
+                padding: 0.3rem !important; /* Reducir el padding de las celdas en la impresión */
+                white-space: normal !important; /* Permitir que el texto se ajuste en la impresión */
+                font-size: 0.7em !important; /* Reducir aún más la fuente de la tabla en la impresión */
+            }
+            .report-header {
+                margin-bottom: 0.75rem !important;
+                padding-bottom: 0.5rem !important;
+                border-bottom: 1px solid #ddd;
+                display: block !important; /* Cambiar a block para apilar elementos */
+                text-align: center; /* Centrar el contenido del encabezado */
+            }
+            .team-logo {
+                max-height: 30px !important;
+                margin-right: 0.5rem !important;
+                display: inline-block !important; /* Permitir alineación con el texto */
+            }
+            .player-name-display {
+                font-size: 0.9em !important;
+                margin-left: 0.5rem !important;
+                display: block !important; /* Mostrar el nombre en una línea separada */
+            }
+            .chart-container {
+                margin-top: 0.75rem !important;
+                padding: 0.5rem !important;
+                box-shadow: none !important;
+                background-color: transparent !important; /* Fondo transparente para el gráfico en la impresión */
+            }
+        }
+        .report-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #ddd;
+        }
+        .report-header h2 {
+            margin: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .team-logo {
+            max-height: 50px;
+            margin-right: 1rem;
+        }
+        .player-name-display {
+            font-size: 1.2rem;
+            color: #555;
+            margin-left: 1rem;
+        }
+        .chart-container {
+            margin-top: 2rem;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator-container w-full max-w-lg">
+        <h1 class="text-3xl font-bold text-center mb-6">Calculadora de Carga Compensatoria Post-Partido</h1>
+
+        <div id="calculator-inputs">
+            <div class="mb-4">
+                <label for="playerName" class="block text-sm font-bold mb-2">Nombre del Jugador:</label>
+                <input type="text" id="playerName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Ingresa el nombre">
+            </div>
+            <div class="mb-4">
+                <label for="position" class="block text-sm font-bold mb-2">Posición del Jugador:</label>
+                <select id="position" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="">Seleccionar Posición</option>
+                    <option value="media-punta">Media Punta</option>
+                    <option value="pivote">Pivote</option>
+                    <option value="lateral-izquierdo">Lateral Izquierdo</option>
+                    <option value="lateral-derecho">Lateral Derecho</option>
+                    <option value="extremo">Extremo</option>
+                    <option value="delantero">Delantero</option>
+                    <option value="defensa-central">Defensa Central</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="minutes" class="block text-sm font-bold mb-2">Minutos Jugados:</label>
+                <input type="number" id="minutes" min="1" max="100" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+
+            <div class="mb-4">
+                <label for="teamLogo" class="block text-sm font-bold mb-2">Escudo del Equipo (Opcional):</label>
+                <input type="file" id="teamLogo" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+
+            <button onclick="calcularCarga()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Calcular</button>
+            <button onclick="window.print()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-4">Imprimir Resultados</button>
+            <button onclick="descargarCSV()" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-4">Descargar CSV</button>
+            </div>
+
+        <div id="resultados" class="mt-6">
+            </div>
+    </div>
+
+    <script>
+        let teamLogoUrl = ''; // Variable para almacenar la URL del logo
+
+        // Función para leer la imagen del logo
+        document.getElementById('teamLogo').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    teamLogoUrl = e.target.result;
+                }
+                reader.readAsDataURL(file);
+            } else {
+                teamLogoUrl = ''; // Limpiar la URL si no se selecciona archivo
+            }
+        });
+
+        function calcularCarga() {
+            const playerName = document.getElementById('playerName').value;
+            const position = document.getElementById('position').value;
+            const minutesPlayed = parseInt(document.getElementById('minutes').value);
+            const resultadosDiv = document.getElementById('resultados');
+            resultadosDiv.innerHTML = ''; // Limpiar resultados previos
+
+            // Mostrar el encabezado del informe con el nombre y el logo
+            let reportHeader = '<div class="report-header">';
+            if (teamLogoUrl) {
+                reportHeader += `<img src="${teamLogoUrl}" alt="Escudo del Equipo" class="team-logo">`;
+            }
+            reportHeader += `<h2 class="text-xl font-semibold">Calculadora de Carga Compensatoria Post-Partido</h2>`;
+            if (playerName) {
+                reportHeader += `<p class="player-name-display">Jugador: <strong>${playerName}</strong></p>`;
+            }
+            reportHeader += '</div>';
+            resultadosDiv.innerHTML += reportHeader;
+
+            if (!position || isNaN(minutesPlayed)) {
+                resultadosDiv.innerHTML += '<p class="text-red-500">Por favor, selecciona una posición e ingresa los minutos jugados.</p>';
+                return;
+            }
+
+            // Datos de referencia (promedio y máximo) por posición (VALORES AJUSTADOS A 95 MINUTOS)
+            const datosReferencia = {
+                'media-punta': {
+                    promedio: { distancia_total: 10546, hsr: 535, sprint: 91, aceleraciones: 21, desaceleraciones: 41 },
+                    maximo: { distancia_total: 11520, hsr: 616, sprint: 170, aceleraciones: 25, desaceleraciones: 47 }
+                },
+                'pivote': {
+                    promedio: { distancia_total: 9813, hsr: 429, sprint: 63, aceleraciones: 20, desaceleraciones: 33 },
+                    maximo: { distancia_total: 11288, hsr: 673, sprint: 146, aceleraciones: 31, desaceleraciones: 50 }
+                },
+                'lateral-izquierdo': {
+                    promedio: { distancia_total: 9338, hsr: 506, sprint: 197, aceleraciones: 29, desaceleraciones: 41 },
+                    maximo: { distancia_total: 10198, hsr: 899, sprint: 380, aceleraciones: 41, desaceleraciones: 47 }
+                },
+                'lateral-derecho': {
+                    promedio: { distancia_total: 8984, hsr: 409, sprint: 102, aceleraciones: 23, desaceleraciones: 30 },
+                    maximo: { distancia_total: 9652, hsr: 659, sprint: 161, aceleraciones: 36, desaceleraciones: 41 }
+                },
+                'extremo': {
+                    promedio: { distancia_total: 8800, hsr: 517, sprint: 158, aceleraciones: 32, desaceleraciones: 42 },
+                    maximo: { distancia_total: 10230, hsr: 844, sprint: 362, aceleraciones: 49, desaceleraciones: 56 }
+                },
+                'delantero': {
+                    promedio: { distancia_total: 8674, hsr: 495, sprint: 114, aceleraciones: 32, desaceleraciones: 40 },
+                    maximo: { distancia_total: 10009, hsr: 733, sprint: 220, aceleraciones: 40, desaceleraciones: 51 }
+                },
+                'defensa-central': {
+                    promedio: { distancia_total: 7850, hsr: 239, sprint: 53, aceleraciones: 17, desaceleraciones: 25 },
+                    maximo: { distancia_total: 8637, hsr: 377, sprint: 139, aceleraciones: 29, desaceleraciones: 39 }
+                }
+            };
+
+            if (!datosReferencia[position]) {
+                resultadosDiv.innerHTML += '<p class="text-red-500">Datos no disponibles para esta posición.</p>';
+                return;
+            }
+
+            const datosPosicion = datosReferencia[position];
+            const factorAjuste = minutesPlayed / 95; // Ajuste proporcional a 95 minutos
+
+            const variables = ['distancia_total', 'hsr', 'sprint', 'aceleraciones', 'desaceleraciones'];
+            const repeticionesPromedioPorVariable = {};
+            const repeticionesMaximoPorVariable = {};
+
+            variables.forEach(variable => {
+                const promedio95 = datosPosicion.promedio[variable];
+                const maximo95 = datosPosicion.maximo[variable];
+                const promedioAjustado = promedio95 * factorAjuste;
+                const maximoAjustado = maximo95 * factorAjuste;
+                const faltaPromedio = Math.max(0, promedio95 - promedioAjustado);
+                const faltaMaximo = Math.max(0, maximo95 - maximoAjustado);
+                let repeticionesProm = '-';
+                let repeticionesMax = '-';
+                let unidad = '';
+
+                switch (variable) {
+                    case 'sprint':
+                        repeticionesProm = Math.ceil(faltaPromedio / 40);
+                        repeticionesMax = Math.ceil(faltaMaximo / 40);
+                        unidad = ' reps (40m)';
+                        repeticionesPromedioPorVariable[variable] = repeticionesProm;
+                        repeticionesMaximoPorVariable[variable] = repeticionesMax;
+                        break;
+                    case 'hsr':
+                        repeticionesProm = Math.ceil(faltaPromedio / 70);
+                        repeticionesMax = Math.ceil(faltaMaximo / 70);
+                        unidad = ' reps (70m)';
+                        repeticionesPromedioPorVariable[variable] = repeticionesProm;
+                        repeticionesMaximoPorVariable[variable] = repeticionesMax;
+                        break;
+                    case 'aceleraciones':
+                        repeticionesProm = Math.ceil(faltaPromedio);
+                        repeticionesMax = Math.ceil(faltaMaximo);
+                        unidad = ' reps (circuito)';
+                        repeticionesPromedioPorVariable[variable] = repeticionesProm;
+                        repeticionesMaximoPorVariable[variable] = repeticionesMax;
+                        break;
+                    case 'desaceleraciones':
+                        repeticionesProm = Math.ceil(faltaPromedio);
+                        repeticionesMax = Math.ceil(faltaMaximo);
+                        unidad = ' reps (circuito)';
+                        repeticionesPromedioPorVariable[variable] = repeticionesProm;
+                        repeticionesMaximoPorVariable[variable] = repeticionesMax;
+                        break;
+                    case 'distancia_total':
+                        repeticionesProm = 'Ver observación';
+                        repeticionesMax = 'Ver observación';
+                        break;
+                }
+
+                let tablaMetrica = `<h2 class="text-xl font-semibold mb-2">${variable.replace('_', ' ').toUpperCase()}</h2><div class="overflow-x-auto"><table class="metric-table">`;
+                tablaMetrica += '<thead class="bg-gray-200 text-gray-700">';
+                tablaMetrica += '<tr><th class="px-4 py-2">Métrica</th><th class="px-4 py-2">Promedio (95 min)</th><th class="px-4 py-2">Máximo (95 min)</th><th class="px-4 py-2">Logrado Promedio</th><th class="px-4 py-2">Logrado Máximo</th><th class="px-4 py-2">Falta para Promedio</th><th class="px-4 py-2">Falta para Máximo</th><th class="px-4 py-2">Rep. Promedio</th><th class="px-4 py-2">Rep. Máximo</th></tr>';
+                tablaMetrica += '</thead><tbody>';
+                tablaMetrica += '<tr>';
+                tablaMetrica += `<td class="border px-4 py-2">${variable.replace('_', ' ').toUpperCase()}</td>`;
+                tablaMetrica += `<td class="border px-4 py-2">${promedio95.toFixed(0)}</td>`; // Valor Absoluto Promedio (95 min)
+                tablaMetrica += `<td class="border px-4 py-2">${maximo95.toFixed(0)}</td>`;    // Valor Absoluto Máximo (95 min)
+                tablaMetrica += `<td class="border px-4 py-2">${promedioAjustado.toFixed(0)}</td>`; // Valor Logrado Promedio (Ajustado)
+                tablaMetrica += `<td class="border px-4 py-2">${maximoAjustado.toFixed(0)}</td>`;    // Valor Logrado Máximo (Ajustado)
+                tablaMetrica += `<td class="border px-4 py-2">${faltaPromedio.toFixed(0)}</td>`;
+                tablaMetrica += `<td class="border px-4 py-2">${faltaMaximo.toFixed(0)}</td>`;
+                tablaMetrica += `<td class="border px-4 py-2">${repeticionesProm}${unidad}</td>`;
+                tablaMetrica += `<td class="border px-4 py-2">${repeticionesMax}${unidad}</td>`;
+                tablaMetrica += '</tr>';
+                tablaMetrica += '</tbody></table></div>';
+                resultadosDiv.innerHTML += tablaMetrica;
+            });
+
+            // Observación para la distancia total
+            resultadosDiv.innerHTML += '<div class="mt-4">';
+            resultadosDiv.innerHTML += '<p style="font-size: 0.8em;"><strong>Observación Distancia Total:</strong> Entre el 12% y el 17% de la distancia total se cubre entre 14.4 y 19.7 km/h. Puede compensarse con series de 105 m (22–25 s) o de 150 m (32–37 s).</p>';
+            resultadosDiv.innerHTML += '</div>';
+
+            // Añadir el contenedor del gráfico después de las tablas
+            resultadosDiv.innerHTML += '<div class="chart-container"><h2 class="text-xl font-semibold mt-8 mb-4">Visualización de Repeticiones Necesarias</h2><div><canvas id="repeticionesPorVariable"></canvas></div></div>';
+
+            // Preparar datos para el gráfico de repeticiones por variable
+            crearGraficoRepeticionesPorVariable(
+                position.charAt(0).toUpperCase() + position.slice(1).replace('-', ' '), // Formatear nombre de la posición
+                [repeticionesPromedioPorVariable.sprint, repeticionesPromedioPorVariable.hsr, repeticionesPromedioPorVariable.aceleraciones, repeticionesPromedioPorVariable.desaceleraciones],
+                [repeticionesMaximoPorVariable.sprint, repeticionesPromedioPorVariable.hsr, repeticionesPromedioPorVariable.aceleraciones, repeticionesMaximoPorVariable.desaceleraciones]
+            );
+        }
+
+        // Función para crear el gráfico de repeticiones por variable
+        function crearGraficoRepeticionesPorVariable(position, dataPromedio, dataMaximo) {
+            const ctx = document.getElementById('repeticionesPorVariable').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Sprint', 'HSR', 'Aceleraciones', 'Desaceleraciones'],
+                    datasets: [{
+                        label: 'Promedio',
+                        data: dataPromedio,
+                        backgroundColor: '#81D4FA', // Azul sólido claro
+                        borderColor: '#81D4FA',
+                        borderWidth: 1
+                    }, {
+                        label: 'Máximo',
+                        data: dataMaximo,
+                        backgroundColor: '#FFD54F', // Amarillo sólido claro
+                        borderColor: '#FFD54F',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Repeticiones',
+                                font: { size: 10 } // Reducir tamaño de la fuente del título del eje Y
+                            },
+                            ticks: { font: { size: 9 } } // Reducir tamaño de la fuente de los valores del eje Y
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Variable Física',
+                                font: { size: 10 } // Reducir tamaño de la fuente del título del eje X
+                            },
+                            ticks: { font: { size: 9 } } // Reducir tamaño de la fuente de los valores del eje X
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Repeticiones Necesarias por Variable (Posición: ${position})`,
+                            font: { size: 12 } // Reducir tamaño de la fuente del título del gráfico
+                        },
+                        legend: {
+                            labels: {
+                                font: { size: 10 } // Reducir tamaño de la fuente de la leyenda
+                            }
+                        },
+                        datalabels: { // Configuración del plugin datalabels
+                            anchor: 'end',
+                            align: 'top',
+                            offset: 4,
+                            color: 'black',
+                            font: {
+                                weight: 'bold',
+                                size: 9 // Reducir tamaño de la fuente de las etiquetas de datos
+                            },
+                            formatter: Math.round // Formatear a número entero
+                        }
+                    }
+                }
+            });
+        }
+
+        function descargarCSV() {
+            const playerName = document.getElementById('playerName').value || 'Sin nombre';
+            const position = document.getElementById('position').value || 'Sin posición';
+            const minutesPlayed = document.getElementById('minutes').value || 'Sin minutos';
+            const resultadosDiv = document.getElementById('resultados');
+            const tablas = resultadosDiv.querySelectorAll('table');
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += `Calculadora de Carga Compensatoria Post-Partido\r\n`;
+            csvContent += `Jugador:,${playerName}\r\n`;
+            csvContent += `Posición:,${position}\r\n`;
+            csvContent += `Minutos Jugados:,${minutesPlayed}\r\n`;
+            csvContent += '\r\n';
+
+            tablas.forEach(tabla => {
+                const filas = tabla.querySelectorAll('tr');
+                filas.forEach(fila => {
+                    const celdas = fila.querySelectorAll('th, td');
+                    const filaCSV = Array.from(celdas).map(celda => celda.textContent).join(',');
+                    csvContent += filaCSV + '\r\n';
+                });
+                csvContent += '\r\n'; // Añadir una línea en blanco entre tablas
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "resultados.csv");
+            document.body.appendChild(link); // Necesario para Firefox
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Función de descarga a PDF eliminada
+    </script>
+</body>
+</html>
